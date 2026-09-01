@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { ChatGoogle } from "@langchain/google";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai"
+import {ChatGroq} from "@langchain/groq"
 dotenv.config();
 
 const app = express();
@@ -37,15 +38,40 @@ app.get("/health", (req, res) => {
 
 // with langchain
 
-const llm = new ChatGoogleGenerativeAI({
-  model:"gemini-2.5-flash",
+// const llm = new ChatGoogleGenerativeAI({
+//   model:"gemini-2.5-flash",
+// })
+
+// app.post("/ai", async (req,res)=>{
+//   const {input} = req.body
+//   const response = await llm.invoke(input)
+
+//   return res.status(200).json({ "ai" : response.content})
+// })
+
+const llm = new ChatGroq({
+  model: "openai/gpt-oss-120b",
+  temperature:0,
+  maxTokens:undefined,
+  maxRetries:2
 })
 
-app.post("/ai", async (req,res)=>{
-  const {input} = req.body
-  const response = await llm.invoke(input)
+app.post("/ai",async(req,res)=>{
+  const{input} = req.body
+  const aiMsg = await llm.invoke([
+    {
+      role:"system",
+      content:"You are a 7 years old child"
+    },
+    {
+      role:"user",
+      content:input
+    }
+  ])
 
-  return res.status(200).json({ "ai" : response.content})
+  return res.status(200).json({
+    msg:aiMsg.content
+  })
 })
 
 
@@ -58,3 +84,14 @@ app.listen(PORT, () => {
 
 // ai agent = LLM  + REAL TIME DATA + MEMORY + ACTION  => CREATE THIS WIHT FRAMEWORK CALLED LANGCHAIN , LANGGRAPH
 // langchain is high level framework.. langgraph is used when workflow becomes complex...langsmith (debuggin tool like postman + logs for ai agents)
+
+// LangChain = give an AI models + tools and build agents easily.
+
+// LangGraph = control exactly how a more complex agent/workflow moves between different steps, branches, loops, and states.
+
+//workflow => user -> write prompt -> goes to llm (knows -> back to user) (dont know) -> web search tool -> back to user
+//langgraph =>  ai workflows representd by graph
+//arrow which connects node are edge
+// each node in the graph performs some task => each node connected to other required nodes(tool web search )(tool node)
+// agent node is connectd with web searhc tool node with conditional edge and web search is connected with agent with compulsory edge
+// state is managed and travles accross all nodes
