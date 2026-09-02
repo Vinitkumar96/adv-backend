@@ -4,6 +4,8 @@ import { GoogleGenAI } from "@google/genai";
 import { ChatGoogle } from "@langchain/google";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai"
 import {ChatGroq} from "@langchain/groq"
+import { Annotation, END, MessagesValue, START, StateGraph, StateSchema } from "@langchain/langgraph";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 dotenv.config();
 
 const app = express();
@@ -49,6 +51,8 @@ app.get("/health", (req, res) => {
 //   return res.status(200).json({ "ai" : response.content})
 // })
 
+// langgraph without tool node
+
 const llm = new ChatGroq({
   model: "openai/gpt-oss-120b",
   temperature:0,
@@ -56,23 +60,58 @@ const llm = new ChatGroq({
   maxRetries:2
 })
 
-app.post("/ai",async(req,res)=>{
-  const{input} = req.body
-  const aiMsg = await llm.invoke([
-    {
-      role:"system",
-      content:"You are a 7 years old child"
-    },
-    {
-      role:"user",
-      content:input
-    }
+const ChatState = new StateSchema({
+  messages: MessagesValue
+})
+
+const chatNode = async(state) =>{
+  const response = await llm.invoke([
+    new SystemMessage("You are a helpful assistant"),
+    ...state.messages
   ])
 
+  return{
+    messages:[response]
+  }
+}
+
+const graph = new StateGraph(ChatState)
+  .addNode("chat", chatNode)
+  .addEdge(START, "chat")
+  .addEdge("chat",END)
+  .compile()
+
+
+app.post("/ai",async (req,res)=>{
+  const{input} = req.body
+
+  const result = await graph.invoke({
+    messages:[
+      new HumanMessage(input)
+    ]
+  })
   return res.status(200).json({
-    msg:aiMsg.content
+    response: result
   })
 })
+
+// app.post("/ai",async(req,res)=>{
+//   const{input} = req.body
+//   const aiMsg = await llm.invoke([
+//     {
+//       role:"system",
+//       content:"You are a 7 years old child"
+//     },
+//     {
+//       role:"user",
+//       content:input
+//     }
+//   ])
+
+//   return res.status(200).json({
+//     msg:aiMsg.content
+//   })
+// })
 
 
 app.listen(PORT, () => {
@@ -88,6 +127,7 @@ app.listen(PORT, () => {
 // LangChain = give an AI models + tools and build agents easily.
 
 // LangGraph = control exactly how a more complex agent/workflow moves between different steps, branches, loops, and states.
+// nodes + edges + state
 
 //workflow => user -> write prompt -> goes to llm (knows -> back to user) (dont know) -> web search tool -> back to user
 //langgraph =>  ai workflows representd by graph
