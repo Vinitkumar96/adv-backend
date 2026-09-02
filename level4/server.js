@@ -5,11 +5,14 @@ import { tool } from "@langchain/core/tools";
 import * as z from "zod";
 import { ChatGroq } from "@langchain/groq";
 import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
+import { MemorySaver } from "@langchain/langgraph";
 dotenv.config();
 const app = express();
 const PORT = 5000;
 
 app.use(express.json());
+
+const checkpointer = new MemorySaver()
 
 // creating a agent with langgraph  and tool node
 /*
@@ -151,7 +154,9 @@ const graph = new StateGraph(ChatState)
     .addEdge(START, "agent")
     .addConditionalEdges("agent",shouldContinue)
     .addEdge("toolNode","agent")
-    .compile()
+    .compile({
+        checkpointer
+    })
 
 app.post("/ai",async(req,res)=>{
     const {input} = req.body
@@ -160,6 +165,10 @@ app.post("/ai",async(req,res)=>{
         messages: [
            new HumanMessage(input)
         ]
+    },{
+        configurable:{
+            thread_id:"chat-1"
+        }
     })
 
     const finalMessage = result.messages.at(-1)
